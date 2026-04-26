@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="mr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hospital Admin App | MS Care</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Tiro+Devanagari+Marathi:wght@400&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body class="admin-app-body">
+  <div class="bg-orb orb-1"></div>
+  <div class="bg-orb orb-2"></div>
+  <div class="mesh"></div>
+
+  <section id="loginScreen" class="admin-login-wrap">
+    <div class="lock-card glass">
+      <div class="lock-icon">🩺</div>
+      <h1>Admin App</h1>
+      <p>Hospital appointments manage करण्यासाठी password टाका.</p>
+      <input id="adminPass" type="password" placeholder="Admin Password" />
+      <button class="btn primary glow full" onclick="loginAdmin()">Login करा</button>
+      <p id="errorMsg" class="error">चुकीचा password. पुन्हा प्रयत्न करा.</p>
+      <p style="font-size:12px;margin-top:16px;color:#64748b">Demo Password: <b>ms1234</b></p>
+    </div>
+  </section>
+
+  <main id="adminApp" class="admin-app-shell" style="display:none">
+    <div class="admin-topbar">
+      <div class="admin-title">
+        <h1>Appointment Admin App</h1>
+        <p>Supabase मधून live appointments fetch होतात.</p>
+      </div>
+      <div class="admin-actions">
+        <a class="btn glass-btn" href="index.html">Website पहा</a>
+        <button class="btn export-btn" onclick="exportCSV()">Export CSV</button>
+        <button class="btn glass-btn" onclick="loadAppointments()">Refresh</button>
+        <button class="btn danger" onclick="deleteAllAppointments()">Delete All</button>
+        <button class="btn glass-btn" onclick="logoutAdmin()">Logout</button>
+      </div>
+    </div>
+
+    <div class="admin-stat-grid">
+      <div class="admin-stat glass"><b id="totalCount">0</b><span>Total</span></div>
+      <div class="admin-stat glass"><b id="pendingCount">0</b><span>Pending</span></div>
+      <div class="admin-stat glass"><b id="confirmedCount">0</b><span>Confirmed</span></div>
+      <div class="admin-stat glass"><b id="paidCount">0</b><span>Paid</span></div>
+    </div>
+
+    <div class="admin-panel-card glass">
+      <div class="admin-table-wrap">
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Patient</th>
+              <th>Phone</th>
+              <th>Doctor</th>
+              <th>Department</th>
+              <th>Visit</th>
+              <th>Message</th>
+              <th>Payment</th>
+              <th>Appointment</th>
+              <th>Admin Note</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+      <div id="empty" class="empty">Loading...</div>
+    </div>
+  </main>
+
+<script>
+const ADMIN_PASSWORD = "ms1234";
+
+const SUPABASE_URL = "https://uabrmbyuauvoxvusnhrq.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVhYnJtYnl1YXV2b3h2dXNuaHJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcxODMxMjEsImV4cCI6MjA5Mjc1OTEyMX0.0iU-RR-aoRZbtwXp50JaEu5_7_wYRnML-tFbCoXgXn8";
+const APPOINTMENTS_API = `${SUPABASE_URL}/rest/v1/appointments`;
+
+let appointmentsData = [];
+
+function headers(extra = {}) {
+  return {
+    "apikey": SUPABASE_ANON_KEY,
+    "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
+    "Content-Type": "application/json",
+    ...extra
+  };
+}
+
+function loginAdmin(){
+  const pass = document.getElementById("adminPass").value;
+  if(pass === ADMIN_PASSWORD){
+    sessionStorage.setItem("adminAppLogin", "yes");
+    showApp();
+  } else {
+    document.getElementById("errorMsg").style.display = "block";
+  }
+}
+
+function showApp(){
+  document.getElementById("loginScreen").style.display = "none";
+  document.getElementById("adminApp").style.display = "block";
+  loadAppointments();
+}
+
+function logoutAdmin(){
+  sessionStorage.removeItem("adminAppLogin");
+  location.reload();
+}
+
+function badge(text, type){
+  return `<span class="badge badge-${type}">${text}</span>`;
+}
+
+async function loadAppointments(){
+  const tbody = document.getElementById("tbody");
+  const empty = document.getElementById("empty");
+  tbody.innerHTML = "";
+  empty.style.display = "block";
+  empty.innerText = "Loading...";
+
+  try {
+    const response = await fetch(`${APPOINTMENTS_API}?select=*&order=created_at.desc`, {
+      method: "GET",
+      headers: headers()
+    });
+
+    if(!response.ok) throw new Error(await response.text());
+
+    appointmentsData = await response.json();
+    renderAppointments();
+  } catch(error) {
+    console.error(error);
+    empty.innerText = "Data fetch होत नाहीये. Supabase table/policies check करा.";
+  }
+}
+
+function renderAppointments(){
+  const data = appointmentsData;
+  const tbody = document.getElementById("tbody");
+  const empty = document.getElementById("empty");
+  tbody.innerHTML = "";
+  empty.style.display = data.length ? "none" : "block";
+  empty.innerText = "अजून कोणतीही appointment नाही.";
+
+  document.getElementById("totalCount").innerText = data.length;
+  document.getElementById("pendingCount").innerText = data.filter(x => (x.appointment_status || "Pending") === "Pending").length;
+  document.getElementById("confirmedCount").innerText = data.filter(x => x.appointment_status === "Confirmed").length;
+  document.getElementById("paidCount").innerText = data.filter(x => x.payment_status === "Paid").length;
+
+  data.forEach((a, index) => {
+    const payment = a.payment_status || "Unpaid";
+    const status = a.appointment_status || "Pending";
+    const created = a.created_at ? new Date(a.created_at).toLocaleString("mr-IN") : "";
+
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${a.id || ""}<br><small>${created}</small></td>
+      <td><b>${a.name || ""}</b></td>
+      <td>${a.phone || ""}</td>
+      <td>${a.doctor || ""}</td>
+      <td>${a.department || ""}</td>
+      <td>${a.date || ""}<br>${a.time || ""}</td>
+      <td>${a.message || "-"}</td>
+      <td>
+        ${badge(payment, payment === "Paid" ? "paid" : "unpaid")}
+        <br><br>
+        <select class="status-select" id="pay-${index}">
+          <option ${payment === "Unpaid" ? "selected" : ""}>Unpaid</option>
+          <option ${payment === "Paid" ? "selected" : ""}>Paid</option>
+        </select>
+      </td>
+      <td>
+        ${badge(status, status.toLowerCase())}
+        <br><br>
+        <select class="status-select" id="status-${index}">
+          <option ${status === "Pending" ? "selected" : ""}>Pending</option>
+          <option ${status === "Confirmed" ? "selected" : ""}>Confirmed</option>
+          <option ${status === "Rejected" ? "selected" : ""}>Rejected</option>
+        </select>
+      </td>
+      <td><input class="note-input" id="note-${index}" value="${a.admin_note || ""}" placeholder="Admin note" /></td>
+      <td>
+        <button class="small-btn save-btn" onclick="saveRow(${index})">Save</button>
+        <button class="small-btn delete-btn" onclick="deleteRow(${index})">Delete</button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+async function saveRow(index){
+  const a = appointmentsData[index];
+  const updates = {
+    payment_status: document.getElementById(`pay-${index}`).value,
+    appointment_status: document.getElementById(`status-${index}`).value,
+    admin_note: document.getElementById(`note-${index}`).value
+  };
+
+  try {
+    const response = await fetch(`${APPOINTMENTS_API}?id=eq.${a.id}`, {
+      method: "PATCH",
+      headers: headers({ "Prefer": "return=representation" }),
+      body: JSON.stringify(updates)
+    });
+
+    if(!response.ok) throw new Error(await response.text());
+
+    alert("Saved ✅");
+    await loadAppointments();
+  } catch(error) {
+    console.error(error);
+    alert("Save होत नाहीये. Supabase update policy check करा.");
+  }
+}
+
+async function deleteRow(index){
+  const a = appointmentsData[index];
+  if(!confirm("ही appointment delete करायची?")) return;
+
+  try {
+    const response = await fetch(`${APPOINTMENTS_API}?id=eq.${a.id}`, {
+      method: "DELETE",
+      headers: headers()
+    });
+
+    if(!response.ok) throw new Error(await response.text());
+
+    await loadAppointments();
+  } catch(error) {
+    console.error(error);
+    alert("Delete होत नाहीये. Supabase delete policy check करा.");
+  }
+}
+
+async function deleteAllAppointments(){
+  if(!confirm("सगळ्या appointments delete करायच्या?")) return;
+  if(!confirm("Confirm करा: हा action undo होणार नाही.")) return;
+
+  try {
+    const response = await fetch(`${APPOINTMENTS_API}?id=gte.0`, {
+      method: "DELETE",
+      headers: headers()
+    });
+
+    if(!response.ok) throw new Error(await response.text());
+
+    await loadAppointments();
+  } catch(error) {
+    console.error(error);
+    alert("Delete all होत नाहीये. Supabase delete policy check करा.");
+  }
+}
+
+function exportCSV(){
+  const data = appointmentsData;
+  if(!data.length){
+    alert("Export करण्यासाठी appointments नाहीत.");
+    return;
+  }
+
+  const headersRow = ["ID","Created At","Name","Phone","Doctor","Department","Date","Time","Message","Payment","Status","Admin Note"];
+  const rows = data.map(a => [
+    a.id || "", a.created_at || "", a.name || "", a.phone || "", a.doctor || "",
+    a.department || "", a.date || "", a.time || "", a.message || "",
+    a.payment_status || "Unpaid", a.appointment_status || "Pending", a.admin_note || ""
+  ]);
+
+  const csv = [headersRow, ...rows]
+    .map(row => row.map(cell => `"${String(cell).replaceAll('"','""')}"`).join(","))
+    .join("\n");
+
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "hospital-appointments.csv";
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+document.getElementById("adminPass").addEventListener("keydown", function(e){
+  if(e.key === "Enter") loginAdmin();
+});
+
+if(sessionStorage.getItem("adminAppLogin") === "yes"){
+  showApp();
+}
+</script>
+</body>
+</html>
