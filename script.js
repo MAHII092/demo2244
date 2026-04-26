@@ -2,7 +2,7 @@ const form = document.getElementById("appointmentForm");
 const successMsg = document.getElementById("successMsg");
 
 const SUPABASE_URL = "https://uabrmbyuauvoxvusnhrq.supabase.co";
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."; // tuza full key
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVhYnJtYnl1YXV2b3h2dXNuaHJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcxODMxMjEsImV4cCI6MjA5Mjc1OTEyMX0.0iU-RR-aoRZbtwXp50JaEu5_7_wYRnML-tFbCoXgXn8"; // tuza full key
 
 form.addEventListener("submit", async function(e) {
   e.preventDefault();
